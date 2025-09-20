@@ -1,5 +1,3 @@
----
-
 # 🌿 Leaffliction
 
 **Leaffliction** is an innovative computer vision project focused on **leaf image analysis** for plant disease recognition.
@@ -54,5 +52,3 @@ Alternatively, you can run individual scripts:
 # Predict on a single image
 ./predict.py [image_path]
 ```
-
----
