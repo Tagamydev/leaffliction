@@ -5,4 +5,5 @@ Test/
 .dataset
 .transformation
 .train
+*__pycache__*
 #Result/Dataset/*
