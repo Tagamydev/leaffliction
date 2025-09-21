@@ -1,75 +1,62 @@
-#%%
+import argparse
+import os
+import multiprocessing
+from srcs.Distribution.dataset_builder import build_dataset_csv
+from srcs.Distribution.visualize import visualize_dataset
 
 
-from pathlib import Path
-import polars as pl
-
-def list_images_to_csv(root: str) -> pl.DataFrame:
-    exts = {".jpg",".jpeg",".png",".webp",".bmp",".tif",".tiff",".gif"}
-    rows = []
-    for p in Path(root).rglob("*"):
-        if p.is_file() and p.suffix.lower() in exts:
-            rows.append({
-                "path": str(p.resolve()),
-                "name": p.name,   
-                "class": p.parent.name,
-                "stem": p.stem,
-                "group": p.stem.split("_")[0]
-            })
-    
-    return pl.from_records(rows)
-# %%
-
-def train_test_val(df:pl.DataFrame)->pl.DataFrame:
-    TRAIN, VAL = (0.7,0.9)
-
-    df2 = df.select(["class","group"]).unique().sample(fraction=1,shuffle=True)
-    df3 = df2.with_columns(
-        idx = pl.cum_count("group").over("class"),
-        tot = pl.n_unique("group").over("class"),
+def main():
+    parser = argparse.ArgumentParser(
+        description="Scan images, build dataset CSV, and visualize class distribution."
     )
-    df4 = df3.with_columns(
-        prop = pl.col("idx")/pl.col("tot")
 
+    parser.add_argument(
+        "directory",
+        type=str,
+        help="Root directory containing images"
     )
-    df5 = df4.with_columns(
-        split = ( pl.when(pl.col("prop") <TRAIN).then(pl.lit("train"))
-                 .when(pl.col("prop") <VAL).then(pl.lit("val"))
-                 .otherwise(pl.lit("test"))
-
-        )
-
+    parser.add_argument(
+        "-o", "--output",
+        type=str,
+        default="dataset.csv",
+        help="Output CSV file name (default: dataset.csv)"
     )
-    df5 = df5.drop(["idx", "tot","prop","class"])
-    return df5
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help="Number of threads to use (default: max available)"
+    )
+    parser.add_argument(
+        "--build_only",
+        action="store_true",
+        help="Only build dataset CSV, do not generate graphs"
+    )
+    parser.add_argument(
+        "--graph_only",
+        action="store_true",
+        help="Only generate graphs from existing CSV (skip building)"
+    )
+
+    args = parser.parse_args()
+
+    if args.build_only and args.graph_only:
+        parser.error("Options --build_only and --graph_only cannot be used together.")
+
+    csv_path = args.output
+
+    if args.graph_only:
+        if not os.path.exists(csv_path):
+            raise FileNotFoundError(f"[ERROR] CSV file '{csv_path}' not found. Run build first.")
+        visualize_dataset(csv_path)
+        return
+
+    # Always build unless graph_only is set
+    build_dataset_csv(args.directory, csv_path, max_workers=args.threads)
+
+    if not args.build_only:
+        visualize_dataset(csv_path)
 
 
-
-#%%
-x=list_images_to_csv(".")
-
-y = train_test_val(x)
-print(y)
-
-# %%
-
-z = x.join(y,on=["group"])
-print(z)
-
-#%%
-
-import plotly.express as px
-
-pdf = z.to_pandas()
-
-#%%
-fig = px.histogram(pdf, x="class", text_auto=True, color = "class",
-                   color_discrete_sequence=px.colors.qualitative.Set3)
-fig.show()
-#%%
-
-
-fig = px.pie(pdf, names="class", color = "class",
-                   color_discrete_sequence=px.colors.qualitative.Set3)
-fig.show()
-# %%
+if __name__ == "__main__":
+    main()

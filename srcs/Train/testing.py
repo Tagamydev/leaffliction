@@ -3,9 +3,6 @@ import torch.nn.functional as F
 from tabulate import tabulate
 
 def print_test_result(t_loss, e_loss, t_accuracy, e_accuracy, t_sens, e_sens, t_spec, e_spec):
-    """
-    Prints training vs evaluation metrics in a nice table.
-    """
     headers = ["Metric", "Train", "Eval"]
     table = [
         ["Loss", f"{t_loss:.4f}", f"{e_loss:.4f}"],
@@ -17,9 +14,6 @@ def print_test_result(t_loss, e_loss, t_accuracy, e_accuracy, t_sens, e_sens, t_
 
 
 def loss(model, dataloader, device="cpu"):
-    """
-    Computes average cross-entropy loss for a dataset.
-    """
     model.eval()
     total_loss = 0.0
     total_samples = 0
