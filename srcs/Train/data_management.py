@@ -7,17 +7,17 @@ from torchvision import transforms as T
 
 class CSVDatasetF3(Dataset):
     """
-    Dataset that reads only the 'train' split from a CSV.
+    Dataset that reads a split (train/val/test) from a CSV.
 
     CSV schema:
-        path,disease,split
-        ./images/Apple_scab/image (197).JPG,Apple_scab,train
+        path,name,class,stem,group,split
+        ./images/Apple_scab/image (197).JPG,image (197).JPG,Apple_scab,image (197),image (197),train
 
     Returns per item:
         {
             "image": FloatTensor [C,H,W],
             "y": LongTensor [],   # class index
-            "label": str,         # raw label from disease column
+            "label": str,         # raw label from 'class' column
             "path": str           # resolved file path
         }
     """
@@ -25,15 +25,15 @@ class CSVDatasetF3(Dataset):
         self.root = Path(root)
         self.rows = []
 
-        # Read CSV and filter only train split
+        # Read CSV and filter only given split
         with open(csv_path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for r in reader:
-                if r["split"].lower() == mask:
-                    self.rows.append({"file": r["path"], "label": r["disease"]})
+                if r["split"].lower() == mask.lower():
+                    self.rows.append({"file": r["path"], "label": r["class"]})
 
         if not self.rows:
-            raise ValueError("No rows found for the 'train' split.")
+            raise ValueError(f"No rows found for split='{mask}' in {csv_path}")
 
         # Create label mapping
         if label_map is None:
@@ -58,7 +58,7 @@ class CSVDatasetF3(Dataset):
 
     def __getitem__(self, i):
         row = self.rows[i]
-        path = (self.root / row["file"]).resolve()
+        path = Path(row["file"]).resolve()  # already full path from CSV
         if not path.exists():
             raise FileNotFoundError(f"Missing image: {path}")
 

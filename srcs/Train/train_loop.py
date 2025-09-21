@@ -1,6 +1,6 @@
 import torch
 import tqdm
-from testing import testing
+from srcs.Train.testing import testing
 
 def train(model, train_loader, eval_loader, device, epochs=10, lr=1e-3, save_every=2, checkpoint_dir="./checkpoints"):
     import os

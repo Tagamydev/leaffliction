@@ -2,3 +2,4 @@ polars
 tabulate
 plotly
 pyarrow
+pandas

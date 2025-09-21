@@ -3,6 +3,9 @@ import torch.nn.functional as F
 from tabulate import tabulate
 
 def print_test_result(t_loss, e_loss, t_accuracy, e_accuracy, t_sens, e_sens, t_spec, e_spec):
+    """
+    Prints a nice table comparing train and eval metrics.
+    """
     headers = ["Metric", "Train", "Eval"]
     table = [
         ["Loss", f"{t_loss:.4f}", f"{e_loss:.4f}"],
@@ -14,6 +17,9 @@ def print_test_result(t_loss, e_loss, t_accuracy, e_accuracy, t_sens, e_sens, t_
 
 
 def loss(model, dataloader, device="cpu"):
+    """
+    Compute average cross-entropy loss over a dataloader.
+    """
     model.eval()
     total_loss = 0.0
     total_samples = 0
@@ -32,57 +38,58 @@ def loss(model, dataloader, device="cpu"):
 
 
 def calculate_metrics(model, dataloader, device="cpu"):
+    """
+    Compute accuracy, sensitivity, and specificity for binary classification.
+    Vectorized version (fast, no Python loops).
+    Assumes labels: 0 = negative, 1 = positive.
+    """
     model.eval()
-
-    true_positives = 0
-    true_negatives = 0
-    false_positives = 0
-    false_negatives = 0
-    total = 0
+    all_true = []
+    all_pred = []
 
     with torch.no_grad():
         for batch in dataloader:
             x = batch["image"].to(device)
             y_true = batch["y"].to(device)
 
-            # Forward pass
             logits = model(x)
             y_pred = torch.argmax(logits, dim=1)
 
-            # Update confusion matrix counts
-            for yt, yp in zip(y_true.cpu().tolist(), y_pred.cpu().tolist()):
-                if yt == 1 and yp == 1:
-                    true_positives += 1
-                elif yt == 0 and yp == 0:
-                    true_negatives += 1
-                elif yt == 0 and yp == 1:
-                    false_positives += 1
-                elif yt == 1 and yp == 0:
-                    false_negatives += 1
-                total += 1
+            all_true.append(y_true)
+            all_pred.append(y_pred)
 
-    # Metrics
-    accuracy = (true_positives + true_negatives) / max(1, total)
-    sensitivity = true_positives / max(1, (true_positives + false_positives))
-    specificity = true_negatives / max(1, (true_negatives + false_negatives))
+    if not all_true:
+        return 0.0, 0.0, 0.0
+
+    y_true = torch.cat(all_true)
+    y_pred = torch.cat(all_pred)
+
+    tp = ((y_true == 1) & (y_pred == 1)).sum().item()
+    tn = ((y_true == 0) & (y_pred == 0)).sum().item()
+    fp = ((y_true == 0) & (y_pred == 1)).sum().item()
+    fn = ((y_true == 1) & (y_pred == 0)).sum().item()
+
+    total = tp + tn + fp + fn
+    accuracy = (tp + tn) / max(1, total)
+    sensitivity = tp / max(1, (tp + fn))   # recall
+    specificity = tn / max(1, (tn + fp))
 
     return accuracy, sensitivity, specificity
 
 
 def testing(model, train_loader, eval_loader, device="cpu"):
     """
-    Run evaluation on training and eval sets, compute loss + metrics.
+    Evaluate the model on training and evaluation sets, print results.
     """
     print("Running tests...")
 
-    # Loss
+    # Compute loss
     t_loss = loss(model, train_loader, device)
     e_loss = loss(model, eval_loader, device)
 
-    # Metrics
+    # Compute metrics
     t_accuracy, t_sens, t_spec = calculate_metrics(model, train_loader, device)
     e_accuracy, e_sens, e_spec = calculate_metrics(model, eval_loader, device)
 
-    # Results
+    # Print results
     print_test_result(t_loss, e_loss, t_accuracy, e_accuracy, t_sens, e_sens, t_spec, e_spec)
-
